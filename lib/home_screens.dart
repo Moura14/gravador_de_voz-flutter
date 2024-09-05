@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:gravador_de_voz/screens/mic_screens.dart';
 import 'package:gravador_de_voz/screens/play_screens.dart';
 import 'package:gravador_de_voz/screens/settingns_sreens.dart';
+import 'package:path_provider/path_provider.dart';
 
 class HomeScreens extends StatefulWidget {
   const HomeScreens({super.key});
@@ -15,17 +18,17 @@ class _HomeScreensState extends State<HomeScreens> {
 
   final List<String> audios = [];
 
-  static final List<Widget> _listScreens = [
-    const MicScreens(),
-    const PlayScreens(
-      audioPaths: [
-        '/data/user/0/com.example.gravador_de_voz/app_flutter/audio.wav',
-        '/data/user/0/com.example.gravador_de_voz/app_flutter/audio_102.wav',
-        '/data/user/0/com.example.gravador_de_voz/app_flutter/audio_304.wav'
-      ],
-    ),
-    const SettignsScreens()
-  ];
+  Future<List<String>> getAudioFilePaths() async {
+    final directory = await getApplicationDocumentsDirectory();
+    final List<FileSystemEntity> files = Directory(directory.path).listSync();
+
+    final List<String> audioPaths = files
+        .where((file) => file.path.endsWith('.wav'))
+        .map((file) => file.path)
+        .toList();
+
+    return audioPaths;
+  }
 
   void onTapButton(int index) {
     setState(() {
@@ -36,19 +39,43 @@ class _HomeScreensState extends State<HomeScreens> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: _listScreens.elementAt(selectIndex),
-      bottomNavigationBar: BottomNavigationBar(
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.mic), label: "Gravar"),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.play_arrow), label: "Reproduzir"),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.settings), label: "Configurações"),
-        ],
-        onTap: onTapButton,
-        currentIndex: selectIndex,
-      ),
+    return MaterialApp(
+      home: FutureBuilder(
+          future: getAudioFilePaths(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const CircularProgressIndicator();
+            } else if (snapshot.hasError) {
+              return const Text('Erro ao carregar áudios');
+            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return const Text('Nenhum áudio encontrado');
+            } else {
+              final List<Widget> listScreen = [
+                const MicScreens(),
+                PlayScreens(audioPaths: snapshot.data!),
+                const SettignsScreens()
+              ];
+
+              return Scaffold(
+                body: Center(
+                  child: listScreen.elementAt(selectIndex),
+                ),
+                bottomNavigationBar: BottomNavigationBar(
+                  items: const [
+                    BottomNavigationBarItem(
+                        icon: Icon(Icons.mic), label: 'Gravar'),
+                    BottomNavigationBarItem(
+                        icon: Icon(Icons.play_arrow),
+                        label: "Reproduzir áudio"),
+                    BottomNavigationBarItem(
+                        icon: Icon(Icons.settings), label: "Configurações")
+                  ],
+                  currentIndex: selectIndex,
+                  onTap: onTapButton,
+                ),
+              );
+            }
+          }),
     );
   }
 }
